@@ -29,7 +29,9 @@ class GaussianPgAgent(BaseAgent):
         super().initialize(env_spaces, share_memory,
             global_B=global_B, env_ranks=env_ranks)
         assert len(env_spaces.action.shape) == 1
-        assert len(np.unique(env_spaces.action.high)) == 1
+        # This assumption is weird, it is fine if the policy outputs large value
+        # the environment should theoretically clip it.
+        # assert len(np.unique(env_spaces.action.high)) == 1
         assert np.all(env_spaces.action.low == -env_spaces.action.high)
         self.distribution = Gaussian(
             dim=env_spaces.action.shape[0],

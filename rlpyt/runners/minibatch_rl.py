@@ -112,6 +112,7 @@ class MinibatchRlBase(BaseRunner):
         # Log at least as often as requested (round down itrs):
         log_interval_itrs = max(self.log_interval_steps //
             self.itr_batch_size, 1)
+        # This is total_steps // itr_batch_size i.e. the total number of iterations
         n_itr = self.n_steps // self.itr_batch_size
         if n_itr % log_interval_itrs > 0:  # Keep going to next log itr.
             n_itr += log_interval_itrs - (n_itr % log_interval_itrs)

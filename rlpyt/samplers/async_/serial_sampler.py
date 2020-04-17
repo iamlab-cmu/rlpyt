@@ -85,6 +85,7 @@ class AsyncSerialSampler(AsyncSamplerMixin, BaseSampler):
         self.collector.reset_if_needed(agent_inputs)
         self.agent_inputs = agent_inputs
         self.traj_infos = traj_infos
+        import ipdb; ipdb.set_trace()
         return completed_infos
 
     def evaluate_agent(self, itr):

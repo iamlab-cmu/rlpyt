@@ -23,6 +23,7 @@ def build_samples_buffer(agent, env, batch_spec, bootstrap_value=False,
             w.join()
         else:
             examples = dict()
+            # MS: Fills the example dict with obs, reward, info etc.
             get_example_outputs(agent, env, examples)
 
     T, B = batch_spec
@@ -43,6 +44,7 @@ def build_samples_buffer(agent, env, batch_spec, bootstrap_value=False,
     all_reward = buffer_from_example(examples["reward"], (T + 1, B), env_shared)
     reward = all_reward[1:]
     prev_reward = all_reward[:-1]  # Writing to reward will populate prev_reward.
+
     done = buffer_from_example(examples["done"], (T, B), env_shared)
     env_info = buffer_from_example(examples["env_info"], (T, B), env_shared)
     env_buffer = EnvSamples(
@@ -64,9 +66,21 @@ def get_example_outputs(agent, env, examples, subprocess=False):
         import torch
         torch.set_num_threads(1)  # Some fix to prevent MKL hang.
     o = env.reset()
-    a = env.action_space.sample()
+    # TODO(Mohit): Hack fix it.
+    if hasattr(env, 'is_vec_env') and env.is_vec_env:
+        a = env.batch_action_space_sample()
+    else:
+        a = env.action_space.sample()
+
     o, r, d, env_info = env.step(a)
-    r = np.asarray(r, dtype="float32")  # Must match torch float dtype here.
+    if hasattr(env, 'is_vec_env') and env.is_vec_env:
+        a = a[0]
+        # Reward is a scalar but we need an array to create buffers hence use 0:1
+        o, r, d, env_info = o[0], r[0], d[0], env_info[0]
+        r = np.asarray(r, dtype="float32")
+    else:
+        r = np.asarray(r, dtype="float32")  # Must match torch float dtype here.
+
     agent.reset()
     agent_inputs = torchify_buffer(AgentInputs(o, a, r))
     a, agent_info = agent.step(*agent_inputs)

@@ -1,4 +1,4 @@
-
+import numpy as np
 from collections import namedtuple
 
 from rlpyt.utils.collections import namedarraytuple, AttrDict
@@ -54,3 +54,43 @@ class TrajInfo(AttrDict):
 
     def terminate(self, observation):
         return self
+
+
+class MS_VecTrajInfo(AttrDict):
+
+    _discount = 1  # Leading underscore, but also class attr not in self.__dict__.
+
+    def __init__(self, n_envs, **kwargs):
+        super().__init__(**kwargs)  # (for AttrDict behavior)
+        self.Length = np.zeros(n_envs)
+        self.Return = np.zeros(n_envs)
+        self.NonzeroRewards = np.zeros(n_envs)
+        self.DiscountedReturn = np.zeros(n_envs)
+        self._cur_discount = np.ones(n_envs)
+
+    def step(self, observation, action, reward, done, agent_info, env_info):
+        done_int = np.asarray(done, dtype=np.int32)
+        not_done_int = 1 - done_int
+        self.Length += not_done_int
+        self.Return += (reward * not_done_int)
+        self.NonzeroRewards += (reward * not_done_int) != 0
+        self.DiscountedReturn += self._cur_discount * (reward * not_done_int)
+        self._cur_discount *= self._discount
+
+    def terminate(self, observation, idx):
+        # Create a new traj info.
+        info = TrajInfo()
+        info.Length = self.Length[idx]
+        info.Return = self.Return[idx]
+        info.NonzeroRewards = self.NonzeroRewards[idx]
+        info.DiscountedReturn = self.DiscountedReturn[idx]
+        info._cur_discount = self._cur_discount[idx]
+
+        # Now reset the old one.
+        self.Length[idx] = 0
+        self.Return[idx] = 0
+        self.NonzeroRewards[idx] = 0
+        self.DiscountedReturn[idx] = 0
+        self._cur_discount[idx] = 0
+
+        return info

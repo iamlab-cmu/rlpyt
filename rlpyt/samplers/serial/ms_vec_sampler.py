@@ -3,11 +3,13 @@ from rlpyt.samplers.base import BaseSampler
 from rlpyt.samplers.buffer import build_samples_buffer
 from rlpyt.utils.logging import logger
 from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
+from rlpyt.samplers.parallel.cpu.ms_vec_collectors import MS_VecCpuResetCollector
+
 from rlpyt.samplers.serial.collectors import SerialEvalCollector
 from rlpyt.utils.seed import set_envs_seeds
 
 
-class SerialSampler(BaseSampler):
+class MS_VecSerialSampler(BaseSampler):
     """The simplest sampler; no parallelism, everything occurs in same, master
     Python process.  This can be easier for debugging (e.g. can use
     ``breakpoint()`` in master process) and might be fast enough for
@@ -16,7 +18,7 @@ class SerialSampler(BaseSampler):
     ones.
     """
 
-    def __init__(self, *args, CollectorCls=CpuResetCollector,
+    def __init__(self, *args, CollectorCls=MS_VecCpuResetCollector,
             eval_CollectorCls=SerialEvalCollector, **kwargs):
         super().__init__(*args, CollectorCls=CollectorCls,
             eval_CollectorCls=eval_CollectorCls, **kwargs)
@@ -41,15 +43,15 @@ class SerialSampler(BaseSampler):
         `action`, etc, which can be used to allocate a replay buffer.
         """
         B = self.batch_spec.B
-        envs = [self.EnvCls(**self.env_kwargs) for _ in range(B)]
+        # envs = [self.EnvCls(**self.env_kwargs) for _ in range(B)]
+        env = self.EnvCls(**self.env_kwargs)
 
-        set_envs_seeds(envs, seed)  # Random seed made in runner.
+        # set_envs_seeds(envs, seed)  # Random seed made in runner.
 
         global_B = B * world_size
-        env_ranks = list(range(rank * B, (rank + 1) * B))
-        agent.initialize(envs[0].spaces, share_memory=False,
-            global_B=global_B, env_ranks=env_ranks)
-        samples_pyt, samples_np, examples = build_samples_buffer(agent, envs[0],
+        agent.initialize(env.spaces, share_memory=False,
+            global_B=global_B)
+        samples_pyt, samples_np, examples = build_samples_buffer(agent, env,
             self.batch_spec, bootstrap_value, agent_shared=False,
             env_shared=False, subprocess=False)
         if traj_info_kwargs:
@@ -57,26 +59,15 @@ class SerialSampler(BaseSampler):
                 setattr(self.TrajInfoCls, "_" + k, v)  # Avoid passing at init.
         collector = self.CollectorCls(
             rank=0,
-            envs=envs,
+            envs=env,
             samples_np=samples_np,
             batch_T=self.batch_spec.T,
             TrajInfoCls=self.TrajInfoCls,
             agent=agent,
             global_B=global_B,
-            env_ranks=env_ranks,  # Might get applied redundantly to agent.
         )
         if self.eval_n_envs > 0:  # May do evaluation.
-            eval_envs = [self.EnvCls(**self.eval_env_kwargs)
-                for _ in range(self.eval_n_envs)]
-            set_envs_seeds(eval_envs, seed)
-            eval_CollectorCls = self.eval_CollectorCls or SerialEvalCollector
-            self.eval_collector = eval_CollectorCls(
-                envs=eval_envs,
-                agent=agent,
-                TrajInfoCls=self.TrajInfoCls,
-                max_T=self.eval_max_steps // self.eval_n_envs,
-                max_trajectories=self.eval_max_trajectories,
-            )
+            raise ValueError("Eval envs are not implemented.")
 
         agent_inputs, traj_infos = collector.start_envs(
             self.max_decorrelation_steps)
@@ -88,7 +79,7 @@ class SerialSampler(BaseSampler):
         self.collector = collector
         self.agent_inputs = agent_inputs
         self.traj_infos = traj_infos
-        logger.log("Serial Sampler initialized.")
+        logger.log("MS_VecSerial Sampler initialized.")
         return examples
 
     def obtain_samples(self, itr):
@@ -102,7 +93,6 @@ class SerialSampler(BaseSampler):
         self.collector.reset_if_needed(agent_inputs)
         self.agent_inputs = agent_inputs
         self.traj_infos = traj_infos
-        import ipdb; ipdb.set_trace()
         return self.samples_pyt, completed_infos
 
     def evaluate_agent(self, itr):

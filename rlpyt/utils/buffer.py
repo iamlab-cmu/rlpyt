@@ -24,6 +24,10 @@ def buffer_from_example(example, leading_dims, share_memory=False,
     """
     if example is None:
         return
+
+    if type(example) is list and example[0] is None:
+        return
+
     if use_NatSchema is None:
         use_NatSchema = isinstance(example, (NamedTuple, NamedArrayTuple))
     try:
@@ -49,7 +53,11 @@ def build_array(example, leading_dims, share_memory=False):
     constructor = np_mp_array if share_memory else np.zeros
     if not isinstance(leading_dims, (list, tuple)):
         leading_dims = (leading_dims,)
-    return constructor(shape=leading_dims + a.shape, dtype=a.dtype)
+    # TODO(Mohit): Can we fix this?
+    if leading_dims[0] > 0:
+        return constructor(shape=leading_dims + a.shape, dtype=a.dtype)
+    else:
+        return constructor(shape=a.shape, dtype=a.dtype)
 
 
 def np_mp_array(shape, dtype):
