@@ -22,11 +22,16 @@ from rlpyt.samplers.serial.ms_vec_sampler import MS_VecSerialSampler
 from rlpyt.samplers.collections import MS_VecTrajInfo
 from rlpyt.envs.isaac_gym import MS_BaseVecEnv
 
+import os
 import sys
 sys.path.append('/home/mohit/projects/force_control/rl-envs')
 
 
-def build_and_train(game="pong", run_ID=0, cuda_idx=None, sample_mode="serial", n_parallel=2):
+def build_and_train(args, 
+                    game="pong", 
+                    run_ID=0, 
+                    cuda_idx=None, 
+                    sample_mode="serial", n_parallel=2):
     affinity = dict(cuda_idx=cuda_idx, workers_cpus=list(range(n_parallel)))
     gpu_cpu = "CPU" if cuda_idx is None else f"GPU {cuda_idx}"
     # if sample_mode == "serial":
@@ -53,8 +58,8 @@ def build_and_train(game="pong", run_ID=0, cuda_idx=None, sample_mode="serial", 
         EnvCls=MS_BaseVecEnv,
         TrajInfoCls=MS_VecTrajInfo,
         env_kwargs=dict(env_klass=env_klass, cfg=cfg),
-        batch_T=200,  # 5 time-steps per sampler iteration.
-        batch_B=4,  # 16 parallel environments.
+        batch_T=2000,  # 5 time-steps per sampler iteration.
+        batch_B=16,  # 16 parallel environments.
         max_decorrelation_steps=0,
     )
     algo = A2C()  # Run with defaults.
@@ -68,15 +73,19 @@ def build_and_train(game="pong", run_ID=0, cuda_idx=None, sample_mode="serial", 
         affinity=affinity,
     )
     config = dict(game=game)
-    name = "a2c_" + game
-    log_dir = "example_3"
-    with logger_context(log_dir, run_ID, name, config):
+    name = "a2c_" + "2d_fitting"
+    if not os.path.exists(args.logdir):
+        os.makedirs(args.logdir)
+    print(f"Will save results to logdir: {args.logdir}")
+
+    with logger_context(args.logdir, run_ID, name, config):
         runner.train()
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('---logdir', type=str, required=True, help='Logdir to save results')
     parser.add_argument('--game', help='Atari game', default='pong')
     parser.add_argument('--run_ID', help='run identifier (logging)', type=int, default=0)
     parser.add_argument('--cuda_idx', help='gpu to use ', type=int, default=None)
@@ -85,6 +94,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_parallel', help='number of sampler workers', type=int, default=2)
     args = parser.parse_args()
     build_and_train(
+        args,
         game=args.game,
         run_ID=args.run_ID,
         cuda_idx=args.cuda_idx,
