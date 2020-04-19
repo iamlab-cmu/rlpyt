@@ -3,10 +3,7 @@ import json
 import os
 import os.path as osp
 from contextlib import contextmanager
-try:
-    from torch.utils.tensorboard.writer import SummaryWriter
-except ImportError:
-    print("Unable to import tensorboard SummaryWriter, proceeding without.")
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from rlpyt.utils.logging import logger
 
@@ -58,13 +55,14 @@ def logger_context(
         print(f"logger_context received log_dir outside of {LOG_DIR}: "
             f"prepending by {LOG_DIR}/local/<yyyymmdd>/<hhmmss>/")
         exp_dir = get_log_dir(log_dir)
+    import ipdb; ipdb.set_trace()
     tabular_log_file = osp.join(exp_dir, "progress.csv")
     text_log_file = osp.join(exp_dir, "debug.log")
     params_log_file = osp.join(exp_dir, "params.json")
 
-    logger.set_snapshot_dir(exp_dir)
+    logger.set_snapshot_dir(osp.join(exp_dir, 'models'))
     if use_summary_writer:
-        logger.set_tf_summary_writer(SummaryWriter(exp_dir))
+        logger.set_tf_summary_writer(SummaryWriter(osp.join(exp_dir, 'logs')))
     logger.add_text_output(text_log_file)
     logger.add_tabular_output(tabular_log_file)
     logger.push_prefix(f"{name}_{run_ID} ")

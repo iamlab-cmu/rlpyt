@@ -58,8 +58,8 @@ def build_and_train(args,
         EnvCls=MS_BaseVecEnv,
         TrajInfoCls=MS_VecTrajInfo,
         env_kwargs=dict(env_klass=env_klass, cfg=cfg),
-        batch_T=2000,  # 5 time-steps per sampler iteration.
-        batch_B=16,  # 16 parallel environments.
+        batch_T=600,  # 5 time-steps per sampler iteration.
+        batch_B=4,  # 16 parallel environments.
         max_decorrelation_steps=0,
     )
     algo = A2C()  # Run with defaults.
@@ -69,7 +69,7 @@ def build_and_train(args,
         agent=agent,
         sampler=sampler,
         n_steps=50e6,
-        log_interval_steps=1e5,
+        log_interval_steps=1e4,
         affinity=affinity,
     )
     config = dict(game=game)
@@ -78,14 +78,16 @@ def build_and_train(args,
         os.makedirs(args.logdir)
     print(f"Will save results to logdir: {args.logdir}")
 
-    with logger_context(args.logdir, run_ID, name, config):
+    with logger_context(args.logdir, run_ID, name, config, 
+                        use_summary_writer=True,
+                        snapshot_mode="gap"):
         runner.train()
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('---logdir', type=str, required=True, help='Logdir to save results')
+    parser.add_argument('--logdir', type=str, required=True, help='Logdir to save results')
     parser.add_argument('--game', help='Atari game', default='pong')
     parser.add_argument('--run_ID', help='run identifier (logging)', type=int, default=0)
     parser.add_argument('--cuda_idx', help='gpu to use ', type=int, default=None)
